@@ -1,18 +1,13 @@
-import { app, auth } from './auth.js';
+import { app, auth, firebaseConfig } from './auth.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut as secSignOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { 
-    getFirestore, 
-    collection, 
-    addDoc, 
-    getDocs, 
-    query, 
-    where,
-    deleteDoc,
-    doc,
-    updateDoc
+    getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const db = getFirestore(app);
+const ADMIN_EMAIL = 'james.sura.r@gmail.com';
 
 // Referencias del DOM
 const tablaDeudas = document.getElementById('tabla-deudas');
@@ -26,6 +21,14 @@ const btnCancelarModal = document.getElementById('btn-cancelar-modal');
 const formNuevaDeuda = document.getElementById('form-nueva-deuda');
 const btnGuardarDeuda = document.getElementById('btn-guardar-deuda');
 const modalTitulo = document.getElementById('modal-titulo');
+
+// Referencias de Admin
+const btnAdmin = document.getElementById('btn-admin');
+const modalAdmin = document.getElementById('modal-admin');
+const btnCerrarAdmin = document.getElementById('btn-cerrar-admin');
+const btnCerrarAdminMobile = document.getElementById('btn-cerrar-admin-mobile');
+const formCrearUsuario = document.getElementById('form-crear-usuario');
+const tablaUsuarios = document.getElementById('tabla-usuarios');
 
 // Estado Global (Filtros PBI)
 let allDeudas = [];
@@ -89,17 +92,13 @@ const renderUI = () => {
         const passEstado = filtroEstado === 'Todas' || data.calculo.estado === filtroEstado;
         const passOrigen = filtroOrigen === 'Todos' || (data.origen || 'Otro') === filtroOrigen;
         
-        // Datos para gráfico de Origen (ignora filtroOrigen para poder mostrar la distribución total del estado)
         if (passEstado) {
             const org = data.origen || 'Otro';
             conteoOrigenes[org] = (conteoOrigenes[org] || 0) + 1;
         }
-
-        // Datos para gráfico de Estado (ignora filtroEstado para poder mostrar todos los estados de un origen)
         if (passOrigen) {
             conteoEstados[data.calculo.estado]++;
         }
-
         return passEstado && passOrigen;
     });
 
@@ -139,23 +138,17 @@ const renderUI = () => {
     statTotal.textContent = formatMoney(sumaTotal);
     statMensual.textContent = formatMoney(sumaMensualEstimada);
     statActivas.textContent = activasCount.toString();
-
     actualizarGraficos(conteoOrigenes, conteoEstados);
 };
 
-// --- Gráficos (Chart.js PBI Style) ---
 const paletaOrigenes = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#ef4444', '#14b8a6'];
-
 const actualizarGraficos = (conteoOrigenes, conteoEstados) => {
     const ctxOrigen = document.getElementById('chartOrigen').getContext('2d');
     const ctxEstado = document.getElementById('chartEstado').getContext('2d');
 
     const origenesLabels = Object.keys(conteoOrigenes);
     const origenesData = Object.values(conteoOrigenes);
-    const origenesColors = origenesLabels.map((l, i) => {
-        // Atenuar los que no están seleccionados
-        return (filtroOrigen === 'Todos' || filtroOrigen === l) ? paletaOrigenes[i % paletaOrigenes.length] : 'rgba(255,255,255,0.1)';
-    });
+    const origenesColors = origenesLabels.map((l, i) => (filtroOrigen === 'Todos' || filtroOrigen === l) ? paletaOrigenes[i % paletaOrigenes.length] : 'rgba(255,255,255,0.1)');
 
     if (chartOrigenInstance) chartOrigenInstance.destroy();
     chartOrigenInstance = new Chart(ctxOrigen, {
@@ -166,7 +159,7 @@ const actualizarGraficos = (conteoOrigenes, conteoEstados) => {
             onClick: (e, elements) => {
                 if (elements.length > 0) {
                     const label = origenesLabels[elements[0].index];
-                    filtroOrigen = (filtroOrigen === label) ? 'Todos' : label; // Toggle
+                    filtroOrigen = (filtroOrigen === label) ? 'Todos' : label;
                     renderUI();
                 }
             },
@@ -183,20 +176,14 @@ const actualizarGraficos = (conteoOrigenes, conteoEstados) => {
     if (chartEstadoInstance) chartEstadoInstance.destroy();
     chartEstadoInstance = new Chart(ctxEstado, {
         type: 'bar',
-        data: {
-            labels: estadosLabels,
-            datasets: [{
-                data: [conteoEstados['Al Día'], conteoEstados['Próxima'], conteoEstados['Finalizada']],
-                backgroundColor: estadosColors, borderRadius: 4
-            }]
-        },
+        data: { labels: estadosLabels, datasets: [{ data: [conteoEstados['Al Día'], conteoEstados['Próxima'], conteoEstados['Finalizada']], backgroundColor: estadosColors, borderRadius: 4 }] },
         options: { 
             responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
             scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
             onClick: (e, elements) => {
                 if (elements.length > 0) {
                     const label = estadosLabels[elements[0].index];
-                    filtroEstado = (filtroEstado === label) ? 'Todas' : label; // Toggle
+                    filtroEstado = (filtroEstado === label) ? 'Todas' : label;
                     actualizarPildorasFiltro();
                     renderUI();
                 }
@@ -225,8 +212,7 @@ document.querySelectorAll('.filtro-btn').forEach(btn => {
     });
 });
 
-// --- Lógica del Modal y CRUD ---
-
+// CRUD Deudas
 const abrirModal = (modo = 'crear', deudaId = null) => {
     modalNuevaDeuda.classList.remove('hidden-view');
     const inputId = document.getElementById('input-deuda-id');
@@ -249,52 +235,32 @@ const abrirModal = (modo = 'crear', deudaId = null) => {
     }
 };
 
-const cerrarModal = () => {
-    modalNuevaDeuda.classList.add('hidden-view');
-    formNuevaDeuda.reset();
-};
+const cerrarModal = () => { modalNuevaDeuda.classList.add('hidden-view'); formNuevaDeuda.reset(); };
 
 btnNuevaDeuda.addEventListener('click', () => abrirModal('crear'));
 btnCerrarModal.addEventListener('click', cerrarModal);
 btnCancelarModal.addEventListener('click', cerrarModal);
 document.getElementById('modal-overlay').addEventListener('click', cerrarModal);
 
-// Delegación de eventos para botones dinámicos en la tabla
 tablaDeudas.addEventListener('click', (e) => {
     const btnEditar = e.target.closest('.btn-editar');
     const btnEliminar = e.target.closest('.btn-eliminar');
-
-    if (btnEditar) {
-        const id = btnEditar.getAttribute('data-id');
-        abrirModal('editar', id);
-    }
-
-    if (btnEliminar) {
-        const id = btnEliminar.getAttribute('data-id');
-        confirmarEliminacion(id);
-    }
+    if (btnEditar) abrirModal('editar', btnEditar.getAttribute('data-id'));
+    if (btnEliminar) confirmarEliminacion(btnEliminar.getAttribute('data-id'));
 });
 
 const confirmarEliminacion = (id) => {
     Swal.fire({
-        title: '¿Estás seguro?',
-        text: "¡No podrás revertir esto!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#3b82f6',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
+        title: '¿Estás seguro?', text: "¡No podrás revertir esto!", icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#3b82f6',
+        confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar'
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
                 await deleteDoc(doc(db, "deudas", id));
                 Swal.fire('Eliminada', 'La deuda ha sido borrada.', 'success');
-                fetchDeudas(auth.currentUser.uid); // Recargar
-            } catch (error) {
-                console.error("Error al eliminar:", error);
-                Swal.fire('Error', 'No se pudo eliminar.', 'error');
-            }
+                fetchDeudas(auth.currentUser.uid);
+            } catch (error) { Swal.fire('Error', 'No se pudo eliminar.', 'error'); }
         }
     });
 };
@@ -319,26 +285,104 @@ formNuevaDeuda.addEventListener('submit', async (e) => {
 
     try {
         if (id) {
-            // Actualizar
             await updateDoc(doc(db, "deudas", id), dataObj);
             Swal.fire('Actualizada', 'La deuda se actualizó con éxito', 'success');
         } else {
-            // Crear
-            await addDoc(collection(db, "deudas"), {
-                ...dataObj,
-                userId: user.uid,
-                fechaCreacion: new Date()
-            });
+            await addDoc(collection(db, "deudas"), { ...dataObj, userId: user.uid, fechaCreacion: new Date() });
             Swal.fire('Guardada', 'Nueva deuda registrada', 'success');
         }
         cerrarModal();
         fetchDeudas(user.uid);
+    } catch (error) { Swal.fire('Error', 'Ocurrió un problema.', 'error'); }
+    finally { btnSpan.textContent = 'Guardar Deuda'; btnGuardarDeuda.disabled = false; }
+});
+
+// --- LÓGICA DE ADMINISTRACIÓN ---
+const cargarUsuarios = async () => {
+    tablaUsuarios.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-slate-400">Cargando usuarios...</td></tr>`;
+    try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        let html = '';
+        querySnapshot.forEach(doc => {
+            const u = doc.data();
+            html += `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="p-4 font-medium">${u.nombre || '-'}</td>
+                    <td class="p-4 text-slate-300">${u.email}</td>
+                    <td class="p-4 text-center">
+                        <button data-email="${u.email}" class="btn-reset text-amber-400 hover:text-amber-300 p-1" title="Restablecer Contraseña">
+                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tablaUsuarios.innerHTML = html || `<tr><td colspan="3" class="p-8 text-center text-slate-400">No hay usuarios registrados.</td></tr>`;
     } catch (error) {
-        console.error("Error guardando:", error);
-        Swal.fire('Error', 'Ocurrió un problema.', 'error');
+        console.error("Error cargando usuarios:", error);
+        tablaUsuarios.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-red-400">Sin permisos o error.</td></tr>`;
+    }
+};
+
+const abrirAdmin = () => {
+    modalAdmin.classList.remove('hidden-view');
+    cargarUsuarios();
+};
+const cerrarAdmin = () => modalAdmin.classList.add('hidden-view');
+
+btnAdmin.addEventListener('click', abrirAdmin);
+btnCerrarAdmin.addEventListener('click', cerrarAdmin);
+btnCerrarAdminMobile.addEventListener('click', cerrarAdmin);
+document.getElementById('modal-admin-overlay').addEventListener('click', cerrarAdmin);
+
+// Crear Usuario Secundario
+formCrearUsuario.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-guardar-usuario');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>Creando...</span>';
+    btn.disabled = true;
+
+    const nombre = document.getElementById('admin-input-nombre').value.trim();
+    const email = document.getElementById('admin-input-email').value.trim();
+    const password = document.getElementById('admin-input-pass').value;
+
+    try {
+        // 1. Instancia secundaria para evitar auto-login que pisa la sesión actual
+        const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp" + Date.now());
+        const secAuth = getAuth(secondaryApp);
+        
+        const cred = await createUserWithEmailAndPassword(secAuth, email, password);
+        const newUid = cred.user.uid;
+        await secSignOut(secAuth); // Cerrar sesión en la instancia secundaria
+
+        // 2. Guardar en Firestore colección 'users'
+        await addDoc(collection(db, "users"), { uid: newUid, nombre, email, fechaCreacion: new Date() });
+        
+        Swal.fire('¡Éxito!', 'Usuario creado correctamente.', 'success');
+        formCrearUsuario.reset();
+        cargarUsuarios();
+    } catch (error) {
+        console.error("Error creando usuario:", error);
+        Swal.fire('Error', error.message, 'error');
     } finally {
-        btnSpan.textContent = 'Guardar Deuda';
-        btnGuardarDeuda.disabled = false;
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+});
+
+// Enviar reseteo de contraseña
+tablaUsuarios.addEventListener('click', async (e) => {
+    const btnReset = e.target.closest('.btn-reset');
+    if (btnReset) {
+        const emailToReset = btnReset.getAttribute('data-email');
+        try {
+            await sendPasswordResetEmail(auth, emailToReset);
+            Swal.fire('Enviado', `Correo de restablecimiento enviado a ${emailToReset}`, 'success');
+        } catch (error) {
+            console.error("Error reseteando:", error);
+            Swal.fire('Error', 'No se pudo enviar el correo', 'error');
+        }
     }
 });
 
@@ -346,5 +390,14 @@ formNuevaDeuda.addEventListener('submit', async (e) => {
 onAuthStateChanged(auth, (user) => {
     if (user) {
         fetchDeudas(user.uid);
+        if (user.email === ADMIN_EMAIL) {
+            btnAdmin.classList.remove('hidden-view');
+        } else {
+            btnAdmin.classList.add('hidden-view');
+            cerrarAdmin();
+        }
+    } else {
+        btnAdmin.classList.add('hidden-view');
+        cerrarAdmin();
     }
 });

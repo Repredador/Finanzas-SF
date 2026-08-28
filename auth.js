@@ -7,7 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 // Tu configuración de Firebase
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBJTgNyYPXrdlzoM97wjE05K8vdQUFZ6qc",
   authDomain: "finanzasfamiliares-app.firebaseapp.com",
   projectId: "finanzasfamiliares-app",
