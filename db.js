@@ -8,16 +8,22 @@ import {
     where 
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { deudasExcel } from './migration.js';
 
 const db = getFirestore(app);
 
-// Referencias del DOM
+// Referencias del DOM principales
 const tablaDeudas = document.getElementById('tabla-deudas');
 const statTotal = document.getElementById('stat-total');
 const statMensual = document.getElementById('stat-mensual');
-const btnImportar = document.getElementById('btn-importar');
-const msgImportacion = document.getElementById('msg-importacion');
+const statActivas = document.getElementById('stat-activas');
+
+// Referencias del Modal
+const modalNuevaDeuda = document.getElementById('modal-nueva-deuda');
+const btnNuevaDeuda = document.getElementById('btn-nueva-deuda');
+const btnCerrarModal = document.getElementById('btn-cerrar-modal');
+const btnCancelarModal = document.getElementById('btn-cancelar-modal');
+const formNuevaDeuda = document.getElementById('form-nueva-deuda');
+const btnGuardarDeuda = document.getElementById('btn-guardar-deuda');
 
 // Helpers de formateo
 const formatMoney = (amount) => {
@@ -32,9 +38,8 @@ const calcularEstadoYCuota = (fechaPrimera, numCuotas) => {
     }
     
     const hoy = new Date();
-    // Parse fecha (asume YYYY-MM-DD)
     const [año, mes, dia] = fechaPrimera.split('-');
-    const fechaInicio = new Date(año, mes - 1, dia); // Meses en JS son 0-11
+    const fechaInicio = new Date(año, mes - 1, dia);
     
     let mesesPasados = (hoy.getFullYear() - fechaInicio.getFullYear()) * 12 + (hoy.getMonth() - fechaInicio.getMonth());
     let cuotaActual = mesesPasados + 1;
@@ -59,11 +64,10 @@ const cargarDeudas = async (userId) => {
         let deudasHtml = '';
         let sumaTotal = 0;
         let sumaMensualEstimada = 0;
-        let contador = 0;
+        let activasCount = 0;
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            contador++;
             
             const monto = data.montoTotal || 0;
             const cuotas = data.numeroCuotas || 0;
@@ -72,6 +76,7 @@ const cargarDeudas = async (userId) => {
             // Calculo de totales (ignorar si está finalizada)
             if (calculo.estado !== 'Finalizada') {
                 sumaTotal += monto;
+                activasCount++;
                 if (cuotas > 0) {
                     sumaMensualEstimada += (monto / cuotas);
                 }
@@ -92,14 +97,15 @@ const cargarDeudas = async (userId) => {
             `;
         });
 
-        if (contador === 0) {
-            tablaDeudas.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No tienes deudas registradas. ¡Usa el botón de importar!</td></tr>`;
+        if (querySnapshot.empty) {
+            tablaDeudas.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No tienes deudas registradas. ¡Agrega una nueva!</td></tr>`;
         } else {
             tablaDeudas.innerHTML = deudasHtml;
         }
 
         statTotal.textContent = formatMoney(sumaTotal);
         statMensual.textContent = formatMoney(sumaMensualEstimada);
+        statActivas.textContent = activasCount.toString();
 
     } catch (error) {
         console.error("Error al obtener deudas:", error);
@@ -107,42 +113,61 @@ const cargarDeudas = async (userId) => {
     }
 };
 
-// Función de Migración (Solo un uso temporal)
-const importarExcelAFirestore = async (userId) => {
-    if (!confirm("¿Estás seguro de importar los 27 registros? Esto puede tardar unos segundos y solo deberías hacerlo una vez.")) return;
-    
-    btnImportar.disabled = true;
-    msgImportacion.classList.remove('hidden');
-    
-    try {
-        let importadas = 0;
-        for (const deuda of deudasExcel) {
-            await addDoc(collection(db, "deudas"), {
-                ...deuda,
-                userId: userId,
-                fechaCreacion: new Date()
-            });
-            importadas++;
-        }
-        alert(`¡Éxito! Se importaron ${importadas} deudas a Firestore.`);
-        btnImportar.classList.add('hidden'); // Ocultar el botón tras éxito
-        cargarDeudas(userId); // Recargar la tabla
-    } catch (error) {
-        console.error("Error importando:", error);
-        alert("Ocurrió un error en la importación. Revisa la consola.");
-    } finally {
-        msgImportacion.classList.add('hidden');
-        btnImportar.disabled = false;
-    }
+// --- Lógica del Modal y Formulario ---
+
+const abrirModal = () => modalNuevaDeuda.classList.remove('hidden-view');
+const cerrarModal = () => {
+    modalNuevaDeuda.classList.add('hidden-view');
+    formNuevaDeuda.reset(); // Limpiar formulario al cerrar
 };
+
+btnNuevaDeuda.addEventListener('click', abrirModal);
+btnCerrarModal.addEventListener('click', cerrarModal);
+btnCancelarModal.addEventListener('click', cerrarModal);
+document.getElementById('modal-overlay').addEventListener('click', cerrarModal); // Cerrar al clickear el fondo
+
+formNuevaDeuda.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (!user) return alert("Debes estar logueado para hacer esto.");
+
+    // Cambiar estado del botón
+    const btnSpan = btnGuardarDeuda.querySelector('span');
+    btnSpan.textContent = 'Guardando...';
+    btnGuardarDeuda.disabled = true;
+
+    // Obtener valores
+    const origen = document.getElementById('input-origen').value.trim();
+    const nombre = document.getElementById('input-nombre').value.trim();
+    const montoTotal = parseFloat(document.getElementById('input-monto').value);
+    const numeroCuotas = parseInt(document.getElementById('input-cuotas').value, 10);
+    const fechaPrimeraCuota = document.getElementById('input-fecha').value;
+
+    try {
+        await addDoc(collection(db, "deudas"), {
+            origen,
+            nombre,
+            montoTotal,
+            numeroCuotas,
+            fechaPrimeraCuota,
+            userId: user.uid,
+            fechaCreacion: new Date()
+        });
+        
+        cerrarModal();
+        cargarDeudas(user.uid); // Recargar la tabla
+    } catch (error) {
+        console.error("Error agregando documento: ", error);
+        alert("Ocurrió un error al guardar la deuda.");
+    } finally {
+        btnSpan.textContent = 'Guardar Deuda';
+        btnGuardarDeuda.disabled = false;
+    }
+});
 
 // Escuchar cambios de sesión
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Al entrar, cargar datos
         cargarDeudas(user.uid);
-        
-        // Habilitar el botón de importar asignando el userId
-        btnImportar.onclick = () => importarExcelAFirestore(user.uid);
     }
 });
