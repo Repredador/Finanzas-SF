@@ -10,6 +10,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- SweetAlert2 (CSS & JS) -->
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.6/dist/sweetalert2.all.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -84,6 +91,15 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Custom SweetAlert2 Dark Theme Overrides */
+        div.swal2-popup {
+            background: #1E1B4B;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #F8FAFC;
+        }
+        .swal2-title { color: #F8FAFC !important; }
+        .swal2-html-container { color: #94A3B8 !important; }
     </style>
 </head>
 <body class="antialiased overflow-x-hidden">
@@ -121,7 +137,7 @@
 
                     <button type="submit" id="login-btn" class="btn-primary w-full py-3 rounded-xl font-semibold text-white mt-4 flex justify-center items-center gap-2">
                         <span>Ingresar</span>
-                        <!-- Spinner (hidden by default) -->
+                        <!-- Spinner -->
                         <svg id="login-spinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -139,7 +155,6 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
                     <div class="flex items-center gap-3">
-                        <!-- Icon -->
                         <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -189,10 +204,35 @@
                 </div>
             </div>
 
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Donut Chart: Deudas por Origen -->
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="font-semibold text-lg mb-4 text-center">Deuda por Origen</h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="chartOrigen"></canvas>
+                    </div>
+                </div>
+                <!-- Bar Chart: Estados -->
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="font-semibold text-lg mb-4 text-center">Estado de las Cuotas</h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="chartEstado"></canvas>
+                    </div>
+                </div>
+            </div>
+
             <!-- Debts List -->
-            <div class="glass-card rounded-2xl overflow-hidden">
-                <div class="p-6 border-b border-white/10 flex justify-between items-center">
+            <div class="glass-card rounded-2xl overflow-hidden mb-12">
+                <div class="p-6 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <h3 class="font-semibold text-lg">Detalle de Deudas</h3>
+                    <!-- Filtros -->
+                    <div class="flex gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0" id="filtros-container">
+                        <button data-filter="Todas" class="filtro-btn bg-primary text-white px-4 py-1.5 rounded-full text-sm font-medium transition-colors border border-primary">Todas</button>
+                        <button data-filter="Al Día" class="filtro-btn bg-transparent text-slate-400 hover:text-white px-4 py-1.5 rounded-full text-sm font-medium transition-colors border border-white/10 hover:border-white/30">Al Día</button>
+                        <button data-filter="Próxima" class="filtro-btn bg-transparent text-slate-400 hover:text-white px-4 py-1.5 rounded-full text-sm font-medium transition-colors border border-white/10 hover:border-white/30">Próximas</button>
+                        <button data-filter="Finalizada" class="filtro-btn bg-transparent text-slate-400 hover:text-white px-4 py-1.5 rounded-full text-sm font-medium transition-colors border border-white/10 hover:border-white/30">Finalizadas</button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -203,18 +243,19 @@
                                 <th class="p-4 font-medium text-right">Monto Total</th>
                                 <th class="p-4 font-medium text-center">Cuota Actual</th>
                                 <th class="p-4 font-medium text-center">Estado</th>
+                                <th class="p-4 font-medium text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-deudas" class="text-sm divide-y divide-white/5">
                             <!-- Filas dinámicas -->
-                            <tr><td colspan="5" class="p-8 text-center text-slate-400">Cargando deudas...</td></tr>
+                            <tr><td colspan="6" class="p-8 text-center text-slate-400">Cargando deudas...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
         </main>
 
-        <!-- MODAL NUEVA DEUDA -->
+        <!-- MODAL NUEVA/EDITAR DEUDA -->
         <div id="modal-nueva-deuda" class="fixed inset-0 z-[100] flex items-center justify-center hidden-view">
             <!-- Overlay background -->
             <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" id="modal-overlay"></div>
@@ -222,7 +263,7 @@
             <!-- Modal panel -->
             <div class="glass-card rounded-2xl w-full max-w-lg p-6 relative z-10 fade-in m-4">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold">Agregar Nueva Deuda</h3>
+                    <h3 id="modal-titulo" class="text-xl font-bold">Agregar Nueva Deuda</h3>
                     <button id="btn-cerrar-modal" class="text-slate-400 hover:text-white transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -231,6 +272,9 @@
                 </div>
 
                 <form id="form-nueva-deuda" class="space-y-5">
+                    <!-- Input oculto para almacenar el ID cuando se edita -->
+                    <input type="hidden" id="input-deuda-id" value="">
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="col-span-2 sm:col-span-1">
                             <label class="block text-sm font-medium text-slate-300 mb-1">Origen / Entidad</label>
@@ -260,7 +304,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-300 mb-1">Fecha de la Primera Cuota</label>
                         <input type="date" id="input-fecha" required 
-                            class="input-premium w-full px-4 py-2.5 rounded-xl text-slate-300">
+                            class="input-premium w-full px-4 py-2.5 rounded-xl text-slate-300" style="color-scheme: dark;">
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-white/10">
