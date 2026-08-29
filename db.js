@@ -703,14 +703,24 @@ btnEjecutarIa.addEventListener('click', async () => {
             return;
         }
 
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
+        const arrayBuffer = await file.arrayBuffer();
         
-        reader.onload = async () => {
-            try {
-                const base64Data = reader.result.split(',')[1];
-                const prompt = `
-Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este documento PDF (estado de cuenta).
+        try {
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            let extractedText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                extractedText += pageText + "\n";
+            }
+            
+            if (!extractedText.trim()) {
+                throw new Error("No se pudo extraer texto del PDF.");
+            }
+
+            const prompt = `
+Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este texto desordenado extraído de un Estado de Cuenta.
 Identifica las transacciones que están siendo facturadas para pagar. Ignora abonos o pagos.
 Estructura exacta por objeto:
 {
@@ -722,67 +732,62 @@ Estructura exacta por objeto:
 }
 
 Responde ÚNICAMENTE con un arreglo de objetos JSON en el formato especificado.
+
+Texto del PDF:
+${extractedText}
 `;
 
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inlineData: { mimeType: "application/pdf", data: base64Data } }
-                            ]
-                        }],
-                        generationConfig: {
-                            responseMimeType: "application/json"
-                        }
-                    })
-                });
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                })
+            });
 
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                const resultText = data.candidates[0].content.parts[0].text;
-                
-                deudasExtraidasIA = JSON.parse(resultText);
-                
-                if (!Array.isArray(deudasExtraidasIA) || deudasExtraidasIA.length === 0) {
-                    throw new Error("No se encontraron deudas claras.");
-                }
-
-                cerrarModalIa();
-                let htmlPreview = '';
-                deudasExtraidasIA.forEach(d => {
-                    htmlPreview += `
-                        <tr class="bg-white/5 border-b border-black/5 dark:border-white/5">
-                            <td class="p-3 font-medium">${d.origen || '-'}</td>
-                            <td class="p-3">${d.nombre || '-'}</td>
-                            <td class="p-3 text-right font-mono">${formatMoney(d.montoTotal)}</td>
-                            <td class="p-3 text-center">${d.numeroCuotas || 0}</td>
-                            <td class="p-3 font-mono text-xs">${d.fechaPrimeraCuota || '-'}</td>
-                        </tr>
-                    `;
-                });
-                tablaPreviewIa.innerHTML = htmlPreview;
-                modalPreviewIa.classList.remove('hidden-view');
-
-            } catch (error) {
-                console.error(error);
-                Swal.fire('Oops...', 'La IA no pudo procesar este PDF. Asegúrate de que sea un Estado de Cuenta válido.', 'error');
-            } finally {
-                btnSpan.textContent = originalText;
-                btnEjecutarIa.disabled = false;
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
             }
-        };
 
-        reader.onerror = () => {
-            Swal.fire('Error', 'No se pudo leer el archivo PDF.', 'error');
+            const data = await response.json();
+            const resultText = data.candidates[0].content.parts[0].text;
+            
+            deudasExtraidasIA = JSON.parse(resultText);
+            
+            if (!Array.isArray(deudasExtraidasIA) || deudasExtraidasIA.length === 0) {
+                throw new Error("No se encontraron deudas claras.");
+            }
+
+            cerrarModalIa();
+            let htmlPreview = '';
+            deudasExtraidasIA.forEach(d => {
+                htmlPreview += `
+                    <tr class="bg-white/5 border-b border-black/5 dark:border-white/5">
+                        <td class="p-3 font-medium">${d.origen || '-'}</td>
+                        <td class="p-3">${d.nombre || '-'}</td>
+                        <td class="p-3 text-right font-mono">${formatMoney(d.montoTotal)}</td>
+                        <td class="p-3 text-center">${d.numeroCuotas || 0}</td>
+                        <td class="p-3 font-mono text-xs">${d.fechaPrimeraCuota || '-'}</td>
+                    </tr>
+                `;
+            });
+            tablaPreviewIa.innerHTML = htmlPreview;
+            modalPreviewIa.classList.remove('hidden-view');
+
+        } catch (error) {
+            console.error(error);
+            Swal.fire('Oops...', 'La IA no pudo procesar este PDF. Asegúrate de que sea un Estado de Cuenta válido.', 'error');
+        } finally {
             btnSpan.textContent = originalText;
             btnEjecutarIa.disabled = false;
-        };
+        }
 
     } catch (error) {
         console.error(error);
