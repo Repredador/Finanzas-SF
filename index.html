@@ -164,6 +164,78 @@
                 </form>
             </div>
         </div>
+
+        <!-- MODAL IMPORTADOR IA -->
+        <div id="modal-importar-ia" class="fixed inset-0 z-[100] flex items-center justify-center hidden-view">
+            <div class="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm transition-opacity" id="modal-ia-overlay"></div>
+            
+            <div class="glass-card rounded-2xl w-full max-w-2xl p-6 relative z-10 fade-in m-4">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Importador Mágico con IA
+                    </h3>
+                    <button id="btn-cerrar-modal-ia" class="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">
+                        Abre tu Estado de Cuenta en PDF (Falabella, BCI, Santander, etc.), selecciona todo el texto con <code class="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded">Ctrl+C</code> y pégalo aquí abajo. No importa si viene desordenado.
+                    </p>
+                    <textarea id="ia-input-texto" rows="10" placeholder="Pega aquí el texto basura de tu banco..." class="input-premium w-full px-4 py-3 rounded-xl font-mono text-xs resize-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-black/5 dark:border-white/10">
+                    <button id="btn-ejecutar-ia" class="bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 shadow-md transition-all">
+                        <span>Extraer Deudas</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL PREVIEW IA -->
+        <div id="modal-preview-ia" class="fixed inset-0 z-[110] flex items-center justify-center hidden-view">
+            <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-md transition-opacity"></div>
+            
+            <div class="glass-card rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 fade-in m-4">
+                <div class="p-6 border-b border-black/10 dark:border-white/10 flex justify-between items-center bg-black/5 dark:bg-white/5">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-900 dark:text-white">Revisión de IA</h3>
+                        <p class="text-sm text-slate-500">Gemini extrajo estas deudas de tu texto. Verifica antes de guardar.</p>
+                    </div>
+                    <button id="btn-cerrar-preview-ia" class="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto p-6" style="max-height: 50vh;">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead class="bg-black/5 dark:bg-white/5 text-slate-700 dark:text-slate-300">
+                            <tr>
+                                <th class="p-3 font-medium rounded-tl-lg">Origen</th>
+                                <th class="p-3 font-medium">Nombre</th>
+                                <th class="p-3 font-medium text-right">Monto</th>
+                                <th class="p-3 font-medium text-center">Cuotas</th>
+                                <th class="p-3 font-medium rounded-tr-lg">Fecha Inic.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-preview-ia" class="divide-y divide-black/5 dark:divide-white/5 text-slate-700 dark:text-slate-200">
+                            <!-- Inyectado por JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-6 border-t border-black/10 dark:border-white/10 flex justify-end gap-3 bg-black/5 dark:bg-white/5">
+                    <button id="btn-cancelar-preview-ia" class="px-5 py-2.5 rounded-xl font-medium text-sm text-slate-600 dark:text-slate-300 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">Descartar</button>
+                    <button id="btn-guardar-preview-ia" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 shadow-md transition-all">
+                        Guardar Todas
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- DASHBOARD SCREEN -->
@@ -214,6 +286,10 @@
                     <button id="btn-descargar-pdf" class="bg-white dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center gap-2 shadow-sm dark:shadow-none">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         Exportar PDF
+                    </button>
+                    <button id="btn-importar-ia" class="bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-md transition-all hover:-translate-y-0.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Importar con IA
                     </button>
                     <button id="btn-nueva-deuda" class="btn-primary px-5 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-md">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -345,32 +421,49 @@
         <div id="modal-admin" class="fixed inset-0 z-[100] flex items-center justify-center hidden-view">
             <div class="absolute inset-0 bg-slate-900/60 dark:bg-slate-900/90 backdrop-blur-sm transition-opacity" id="modal-admin-overlay"></div>
             <div class="glass-card rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative z-10 fade-in m-4 flex flex-col md:flex-row gap-8">
-                <!-- Columna Izquierda: Crear Usuario -->
-                <div class="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10 pb-6 md:pb-0 md:pr-6">
-                    <div class="flex justify-between items-center mb-6 md:hidden">
-                        <h3 class="text-xl font-bold text-amber-600 dark:text-amber-400">Panel Admin</h3>
-                        <button id="btn-cerrar-admin-mobile" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
+                <!-- Columna Izquierda: Crear Usuario y Configuración IA -->
+                <div class="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10 pb-6 md:pb-0 md:pr-6 flex flex-col gap-8">
+                    
+                    <div>
+                        <div class="flex justify-between items-center mb-6 md:hidden">
+                            <h3 class="text-xl font-bold text-amber-600 dark:text-amber-400">Panel Admin</h3>
+                            <button id="btn-cerrar-admin-mobile" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <h4 class="font-semibold text-lg mb-4 text-slate-900 dark:text-white">Crear Familiar</h4>
+                        <form id="form-crear-usuario" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre</label>
+                                <input type="text" id="admin-input-nombre" required class="input-premium w-full px-4 py-2.5 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico</label>
+                                <input type="email" id="admin-input-email" required class="input-premium w-full px-4 py-2.5 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Contraseña Temporal</label>
+                                <input type="password" id="admin-input-pass" required minlength="6" class="input-premium w-full px-4 py-2.5 rounded-xl">
+                            </div>
+                            <button type="submit" id="btn-guardar-usuario" class="w-full bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/50 py-2.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 mt-4">
+                                <span>Crear Usuario</span>
+                            </button>
+                        </form>
                     </div>
-                    <h4 class="font-semibold text-lg mb-4 text-slate-900 dark:text-white">Crear Familiar</h4>
-                    <form id="form-crear-usuario" class="space-y-4">
+
+                    <div class="pt-6 border-t border-black/10 dark:border-white/10">
+                        <h4 class="font-semibold text-lg mb-2 text-slate-900 dark:text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Configuración de IA
+                        </h4>
+                        <p class="text-xs text-slate-500 mb-4">Ingresa tu clave de Gemini API para usar el importador inteligente (Se guarda localmente).</p>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre</label>
-                            <input type="text" id="admin-input-nombre" required class="input-premium w-full px-4 py-2.5 rounded-xl">
+                            <input type="password" id="input-gemini-key" placeholder="AIzaSy..." class="input-premium w-full px-4 py-2.5 rounded-xl text-sm mb-2">
+                            <button id="btn-guardar-llave-ia" class="w-full bg-purple-100 dark:bg-purple-500/20 hover:bg-purple-200 dark:hover:bg-purple-500/30 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-500/50 py-2 rounded-lg text-sm font-semibold transition-all">
+                                Guardar Llave
+                            </button>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico</label>
-                            <input type="email" id="admin-input-email" required class="input-premium w-full px-4 py-2.5 rounded-xl">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Contraseña Temporal</label>
-                            <input type="password" id="admin-input-pass" required minlength="6" class="input-premium w-full px-4 py-2.5 rounded-xl">
-                        </div>
-                        <button type="submit" id="btn-guardar-usuario" class="w-full bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/50 py-2.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 mt-4">
-                            <span>Crear Usuario</span>
-                        </button>
-                    </form>
+                    </div>
                 </div>
                 <!-- Columna Derecha: Lista de Usuarios -->
                 <div class="w-full md:w-2/3">

@@ -24,7 +24,23 @@ const modalTitulo = document.getElementById('modal-titulo');
 const saludoHeader = document.getElementById('saludo-header');
 const btnDescargarPdf = document.getElementById('btn-descargar-pdf');
 
-// Referencias de Admin
+// Referencias de IA
+const btnImportarIa = document.getElementById('btn-importar-ia');
+const modalImportarIa = document.getElementById('modal-importar-ia');
+const btnCerrarModalIa = document.getElementById('btn-cerrar-modal-ia');
+const btnEjecutarIa = document.getElementById('btn-ejecutar-ia');
+const iaInputTexto = document.getElementById('ia-input-texto');
+
+const modalPreviewIa = document.getElementById('modal-preview-ia');
+const btnCerrarPreviewIa = document.getElementById('btn-cerrar-preview-ia');
+const btnCancelarPreviewIa = document.getElementById('btn-cancelar-preview-ia');
+const btnGuardarPreviewIa = document.getElementById('btn-guardar-preview-ia');
+const tablaPreviewIa = document.getElementById('tabla-preview-ia');
+
+const inputGeminiKey = document.getElementById('input-gemini-key');
+const btnGuardarLlaveIa = document.getElementById('btn-guardar-llave-ia');
+
+let deudasExtraidasIA = [];
 const btnAdmin = document.getElementById('btn-admin');
 const modalAdmin = document.getElementById('modal-admin');
 const btnCerrarAdmin = document.getElementById('btn-cerrar-admin');
@@ -579,10 +595,154 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         updateGreeting(user.email);
         fetchDeudas(user.uid);
-        if (user.email === ADMIN_EMAIL) btnAdmin.classList.remove('hidden-view');
+        if (user.email === ADMIN_EMAIL) {
+            btnAdmin.classList.remove('hidden-view');
+            // Cargar llave IA si existe
+            if (localStorage.geminiApiKey) {
+                inputGeminiKey.value = localStorage.geminiApiKey;
+            }
+        }
         else { btnAdmin.classList.add('hidden-view'); cerrarAdmin(); }
     } else {
         btnAdmin.classList.add('hidden-view');
         cerrarAdmin();
+    }
+});
+
+// --- IMPORTADOR MÁGICO CON IA (GEMINI) ---
+btnGuardarLlaveIa.addEventListener('click', () => {
+    const key = inputGeminiKey.value.trim();
+    if (key) {
+        localStorage.geminiApiKey = key;
+        Swal.fire('Guardada', 'Clave API guardada en el navegador.', 'success');
+    } else {
+        localStorage.removeItem('geminiApiKey');
+        Swal.fire('Borrada', 'Clave API eliminada.', 'info');
+    }
+});
+
+const cerrarModalIa = () => modalImportarIa.classList.add('hidden-view');
+btnImportarIa.addEventListener('click', () => {
+    if (!localStorage.geminiApiKey) {
+        Swal.fire('Falta Configuración', 'Primero debes ingresar tu clave API de Gemini en el Panel de Admin.', 'warning');
+        return;
+    }
+    iaInputTexto.value = '';
+    modalImportarIa.classList.remove('hidden-view');
+});
+btnCerrarModalIa.addEventListener('click', cerrarModalIa);
+document.getElementById('modal-ia-overlay').addEventListener('click', cerrarModalIa);
+
+const cerrarPreviewIa = () => modalPreviewIa.classList.add('hidden-view');
+btnCerrarPreviewIa.addEventListener('click', cerrarPreviewIa);
+btnCancelarPreviewIa.addEventListener('click', cerrarPreviewIa);
+
+btnEjecutarIa.addEventListener('click', async () => {
+    const textoCrudo = iaInputTexto.value.trim();
+    if (!textoCrudo) {
+        Swal.fire('Error', 'Pega el texto del estado de cuenta primero.', 'error');
+        return;
+    }
+
+    const apiKey = localStorage.geminiApiKey;
+    const btnSpan = btnEjecutarIa.querySelector('span');
+    const originalText = btnSpan.textContent;
+    btnSpan.textContent = 'Analizando con IA...';
+    btnEjecutarIa.disabled = true;
+
+    const prompt = `
+Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este texto desordenado de un estado de cuenta bancario.
+Responde ÚNICAMENTE con un arreglo en formato JSON válido. Ni una sola palabra más, sin bloques de markdown.
+Estructura exacta por objeto:
+{
+  "origen": "string (nombre de tienda o banco. Ej: CMR, Ripley, Supermercado)",
+  "nombre": "string (descripción de la compra)",
+  "montoTotal": numero (el valor total de la deuda. Sin simbolos, solo el numero),
+  "numeroCuotas": numero (cantidad total de cuotas. Si dice 03/12, el total es 12. Si no es en cuotas, pon 0),
+  "fechaPrimeraCuota": "string (YYYY-MM-DD. Aproxímala si es necesario, o usa la fecha de la transacción)"
+}
+
+Texto a analizar:
+${textoCrudo}
+    `;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+
+        if (!response.ok) throw new Error("Error en la API de Gemini (Revisa tu clave)");
+
+        const data = await response.json();
+        let iaText = data.candidates[0].content.parts[0].text;
+        
+        // Limpiar markdown residual de la respuesta
+        iaText = iaText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        
+        deudasExtraidasIA = JSON.parse(iaText);
+        
+        if (!Array.isArray(deudasExtraidasIA) || deudasExtraidasIA.length === 0) {
+            throw new Error("No se encontraron deudas claras.");
+        }
+
+        // Renderizar Preview
+        cerrarModalIa();
+        let htmlPreview = '';
+        deudasExtraidasIA.forEach(d => {
+            htmlPreview += `
+                <tr class="bg-white/5 border-b border-black/5 dark:border-white/5">
+                    <td class="p-3 font-medium">${d.origen || '-'}</td>
+                    <td class="p-3">${d.nombre || '-'}</td>
+                    <td class="p-3 text-right font-mono">${formatMoney(d.montoTotal)}</td>
+                    <td class="p-3 text-center">${d.numeroCuotas || 0}</td>
+                    <td class="p-3 font-mono text-xs">${d.fechaPrimeraCuota || '-'}</td>
+                </tr>
+            `;
+        });
+        tablaPreviewIa.innerHTML = htmlPreview;
+        modalPreviewIa.classList.remove('hidden-view');
+
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Oops...', 'La IA no pudo procesar este texto o falló la clave. Intenta de nuevo.', 'error');
+    } finally {
+        btnSpan.textContent = originalText;
+        btnEjecutarIa.disabled = false;
+    }
+});
+
+btnGuardarPreviewIa.addEventListener('click', async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    btnGuardarPreviewIa.textContent = 'Guardando...';
+    btnGuardarPreviewIa.disabled = true;
+
+    try {
+        const promesas = deudasExtraidasIA.map(dObj => {
+            return addDoc(collection(db, "deudas"), {
+                origen: dObj.origen || 'Banco',
+                nombre: dObj.nombre || 'Importado por IA',
+                montoTotal: Number(dObj.montoTotal) || 0,
+                numeroCuotas: Number(dObj.numeroCuotas) || 0,
+                fechaPrimeraCuota: dObj.fechaPrimeraCuota || new Date().toISOString().split('T')[0],
+                userId: user.uid,
+                fechaCreacion: new Date()
+            });
+        });
+
+        await Promise.all(promesas);
+        Swal.fire('¡Magia Pura!', `Se importaron ${deudasExtraidasIA.length} deudas exitosamente.`, 'success');
+        
+        cerrarPreviewIa();
+        fetchDeudas(user.uid);
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'Hubo un problema al guardar las deudas.', 'error');
+    } finally {
+        btnGuardarPreviewIa.innerHTML = 'Guardar Todas';
+        btnGuardarPreviewIa.disabled = false;
     }
 });
