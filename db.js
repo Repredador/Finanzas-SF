@@ -693,7 +693,8 @@ btnEjecutarIa.addEventListener('click', async () => {
 
     try {
         const configDoc = await getDoc(doc(db, "config", "apiKeys"));
-        const apiKey = configDoc.exists() ? configDoc.data().gemini : null;
+        const rawApiKey = configDoc.exists() ? configDoc.data().gemini : null;
+        const apiKey = rawApiKey ? rawApiKey.trim() : null;
 
         if (!apiKey) {
             Swal.fire('Falta Configuración', 'El Administrador aún no ha configurado la clave de IA.', 'warning');
@@ -737,7 +738,7 @@ Texto del PDF:
 ${extractedText}
 `;
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
