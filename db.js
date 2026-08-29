@@ -269,80 +269,124 @@ document.querySelectorAll('.filtro-btn').forEach(btn => {
     });
 });
 
-// --- EXPORTAR A PDF ---
+// --- EXPORTAR A PDF (REPORTE PROFESIONAL jsPDF) ---
 btnDescargarPdf.addEventListener('click', () => {
-    const element = document.getElementById('report-content');
+    // 1. Obtener la librería
+    const { jsPDF } = window.jspdf;
+    // Orientación paisaje, unidad puntos, tamaño carta
+    const doc = new jsPDF('landscape', 'pt', 'letter');
     
-    // Ocultar botones interactivos
-    document.querySelectorAll('.pdf-export-hide').forEach(el => el.classList.add('hidden'));
+    const isDarkTheme = htmlEl.classList.contains('dark');
+    const primaryColor = [79, 70, 229]; // #4F46E5
+    const textColor = isDarkTheme ? [220, 220, 220] : [15, 23, 42];
+    const bgColor = isDarkTheme ? [15, 23, 42] : [255, 255, 255];
+    
+    // Si queremos un PDF estilo oscuro, pintamos el fondo (opcional, pero profesionalmente es mejor PDF claro)
+    // Para reportes financieros impresos, forzaremos SIEMPRE un fondo claro por legibilidad en papel.
+    
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
 
-    // Guardar estado original
-    const wasDark = htmlEl.classList.contains('dark');
-    const originalClasses = element.className;
-    const originalStyle = element.getAttribute('style') || '';
+    // --- ENCABEZADO ---
+    doc.setFontSize(22);
+    doc.setTextColor(15, 23, 42); // Siempre oscuro para el PDF
+    doc.setFont("helvetica", "bold");
+    doc.text("Finanzas SF - Reporte de Deudas", 40, 50);
 
-    // 1. Forzar Modo Claro (mejor contraste para imprimir)
-    if (wasDark) applyTheme(false);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // Gris
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generado el: ${new Date().toLocaleString('es-CL')}`, 40, 70);
+    doc.text(`Filtro activo: Origen (${filtroOrigen}) | Estado (${filtroEstado})`, 40, 85);
 
-    // 2. Preparar el contenedor para que html2canvas no genere barras negras en los márgenes
-    element.className = 'p-8 bg-white'; // Quitar mx-auto, px-4, max-w-7xl temporalmente
-    element.style.width = '1200px'; // Forzar ancho de escritorio
-    element.style.maxWidth = '1200px';
-    element.style.margin = '0';
-    element.style.background = '#ffffff';
+    // --- KPIs (RESUMEN EJECUTIVO) ---
+    doc.setDrawColor(226, 232, 240); // Borde
+    doc.setFillColor(248, 250, 252); // Fondo cajita
+    doc.roundedRect(40, 110, 220, 60, 5, 5, 'FD'); // X, Y, Ancho, Alto, Radios
+    doc.roundedRect(280, 110, 220, 60, 5, 5, 'FD');
+    doc.roundedRect(520, 110, 220, 60, 5, 5, 'FD');
 
-    // 3. Forzar fondos sólidos en las tarjetas de cristal (html2canvas sufre con backdrop-filter)
-    const glassCards = element.querySelectorAll('.glass-card');
-    glassCards.forEach(c => {
-        c.setAttribute('data-orig-style', c.getAttribute('style') || '');
-        c.style.background = '#ffffff';
-        c.style.backdropFilter = 'none';
-        c.style.boxShadow = 'none';
-        c.style.border = '1px solid #e2e8f0';
-    });
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Total Adeudado", 50, 130);
+    doc.text("Pago Mensual Estimado", 290, 130);
+    doc.text("Deudas Activas", 530, 130);
 
-    // 4. Cambiar color del texto explícitamente para asegurar contraste
-    const texts = element.querySelectorAll('.text-slate-500, .text-slate-400');
-    texts.forEach(t => {
-        t.setAttribute('data-orig-text', 'true');
-        t.style.color = '#475569'; // text-slate-600
-    });
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.text(statTotal.textContent, 50, 155);
+    doc.text(statMensual.textContent, 290, 155);
+    doc.text(statActivas.textContent, 530, 155);
 
-    const opt = {
-      margin:       [0.5, 0.5, 0.5, 0.5], // Top, Left, Bottom, Right
-      filename:     `Finanzas_Reporte_${new Date().toLocaleDateString('es-CL')}.pdf`,
-      image:        { type: 'jpeg', quality: 1 },
-      html2canvas:  { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: '#ffffff',
-          windowWidth: 1200,
-          scrollY: 0
-      },
-      jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    // --- GRÁFICOS (Extraer del Canvas real) ---
+    // Necesitamos asegurarnos de que el fondo del gráfico sea blanco antes de extraer, 
+    // pero Chart.js por defecto tiene fondo transparente. 
+    // La forma fácil: extraer con toDataURL y pintar un fondo en jsPDF.
+    
+    // Nota: toDataURL funciona bien si el canvas está renderizado.
+    const addChartToPdf = (canvasId, x, y, w, h) => {
+        const canvas = document.getElementById(canvasId);
+        if(canvas) {
+            // Pintar un cuadrado blanco de fondo en el PDF para asegurar contraste
+            doc.setFillColor(255, 255, 255);
+            doc.rect(x, y, w, h, 'F');
+            const imgData = canvas.toDataURL("image/png", 1.0);
+            doc.addImage(imgData, 'PNG', x, y, w, h);
+        }
     };
 
-    // Dar tiempo a Chart.js para renderizar colores claros si venía de oscuro
-    setTimeout(() => {
-        html2pdf().set(opt).from(element).save().then(() => {
-            // Restaurar estado original
-            document.querySelectorAll('.pdf-export-hide').forEach(el => el.classList.remove('hidden'));
-            element.className = originalClasses;
-            element.setAttribute('style', originalStyle);
-            
-            glassCards.forEach(c => {
-                c.setAttribute('style', c.getAttribute('data-orig-style'));
-            });
+    doc.setFontSize(12);
+    doc.text("Deuda por Origen", 150, 210);
+    doc.text("Estado de las Cuotas", 500, 210);
+    
+    addChartToPdf('chartOrigen', 40, 230, 250, 150);
+    addChartToPdf('chartEstado', 360, 230, 350, 150);
 
-            texts.forEach(t => {
-                t.style.color = '';
-                t.removeAttribute('data-orig-text');
-            });
+    // --- TABLA DE DATOS ---
+    // Recopilar datos filtrados
+    const deudasFiltradas = allDeudas.filter(data => {
+        const passEstado = filtroEstado === 'Todas' || data.calculo.estado === filtroEstado;
+        const passOrigen = filtroOrigen === 'Todos' || (data.origen || 'Otro') === filtroOrigen;
+        return passEstado && passOrigen;
+    });
 
-            if (wasDark) applyTheme(true);
-        });
-    }, 300);
+    const tableData = deudasFiltradas.map(d => [
+        d.origen || '-',
+        d.nombre || '-',
+        formatMoney(d.montoTotal || 0),
+        d.numeroCuotas > 0 ? `${d.calculo.cuotaNum} de ${d.numeroCuotas}` : 'Sin cuotas',
+        d.calculo.estado
+    ]);
+
+    doc.autoTable({
+        startY: 420,
+        head: [['Origen', 'Nombre', 'Monto Total', 'Cuotas', 'Estado']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { 
+            fillColor: primaryColor,
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        styles: { 
+            font: 'helvetica', 
+            fontSize: 10,
+            textColor: 50
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] }, // slate-50
+        margin: { left: 40, right: 40 },
+        // Paginación: agregar número de página
+        didDrawPage: function (data) {
+            let str = "Página " + doc.internal.getNumberOfPages();
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(str, data.settings.margin.left, pageHeight - 20);
+        }
+    });
+
+    // --- DESCARGAR ---
+    doc.save(`Reporte_Finanzas_${new Date().toLocaleDateString('es-CL')}.pdf`);
 });
 
 // CRUD Deudas
