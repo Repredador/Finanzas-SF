@@ -120,6 +120,7 @@
             border: 1px solid rgba(0, 0, 0, 0.1);
             color: #0F172A;
             transition: all 0.2s ease;
+            font-size: 16px !important; /* Prevents iOS auto-zoom */
         }
         .dark .input-premium {
             background: rgba(0, 0, 0, 0.2);
@@ -206,12 +207,18 @@
                 border-bottom-right-radius: 0;
                 margin: 0;
                 max-height: 90vh;
+                overflow-y: auto; /* Fixes content cutoff */
                 animation: slideUpMobile 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             }
         }
         @keyframes slideUpMobile {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
+        }
+
+        /* Safe Area Insets for iOS */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe { padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)) !important; }
         }
     </style>
 </head>
@@ -353,7 +360,7 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 fade-in" style="animation-delay: 0.2s;">
-                <div class="glass-card p-6 md:p-8 rounded-3xl group">
+                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="font-display font-semibold text-lg text-slate-800 dark:text-slate-200">Deuda por Entidad</h3>
                         <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
@@ -364,7 +371,7 @@
                         <canvas id="chartOrigen"></canvas>
                     </div>
                 </div>
-                <div class="glass-card p-6 md:p-8 rounded-3xl group">
+                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="font-display font-semibold text-lg text-slate-800 dark:text-slate-200">Estado de las Cuotas</h3>
                         <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
