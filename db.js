@@ -2,7 +2,7 @@ import { app, auth, firebaseConfig } from './auth.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut as secSignOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { 
-    getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc
+    getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, getDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
@@ -597,10 +597,12 @@ onAuthStateChanged(auth, (user) => {
         fetchDeudas(user.uid);
         if (user.email === ADMIN_EMAIL) {
             btnAdmin.classList.remove('hidden-view');
-            // Cargar llave IA si existe
-            if (localStorage.geminiApiKey) {
-                inputGeminiKey.value = localStorage.geminiApiKey;
-            }
+            // Cargar llave IA si existe en Firestore
+            getDoc(doc(db, "config", "apiKeys")).then(configDoc => {
+                if (configDoc.exists() && configDoc.data().gemini) {
+                    inputGeminiKey.value = configDoc.data().gemini;
+                }
+            }).catch(e => console.error("Error leyendo clave config:", e));
         }
         else { btnAdmin.classList.add('hidden-view'); cerrarAdmin(); }
     } else {
@@ -610,23 +612,31 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // --- IMPORTADOR MÁGICO CON IA (GEMINI) ---
-btnGuardarLlaveIa.addEventListener('click', () => {
+btnGuardarLlaveIa.addEventListener('click', async () => {
     const key = inputGeminiKey.value.trim();
-    if (key) {
-        localStorage.geminiApiKey = key;
-        Swal.fire('Guardada', 'Clave API guardada en el navegador.', 'success');
-    } else {
-        localStorage.removeItem('geminiApiKey');
-        Swal.fire('Borrada', 'Clave API eliminada.', 'info');
+    const originalText = btnGuardarLlaveIa.textContent;
+    btnGuardarLlaveIa.textContent = 'Guardando...';
+    btnGuardarLlaveIa.disabled = true;
+
+    try {
+        if (key) {
+            await setDoc(doc(db, "config", "apiKeys"), { gemini: key }, { merge: true });
+            Swal.fire('Guardada', 'Clave API guardada en la base de datos para toda la familia.', 'success');
+        } else {
+            await setDoc(doc(db, "config", "apiKeys"), { gemini: null }, { merge: true });
+            Swal.fire('Borrada', 'Clave API eliminada.', 'info');
+        }
+    } catch (error) {
+        console.error("Error guardando llave:", error);
+        Swal.fire('Error', 'No tienes permisos de Administrador o falló la red.', 'error');
+    } finally {
+        btnGuardarLlaveIa.textContent = originalText;
+        btnGuardarLlaveIa.disabled = false;
     }
 });
 
 const cerrarModalIa = () => modalImportarIa.classList.add('hidden-view');
 btnImportarIa.addEventListener('click', () => {
-    if (!localStorage.geminiApiKey) {
-        Swal.fire('Falta Configuración', 'Primero debes ingresar tu clave API de Gemini en el Panel de Admin.', 'warning');
-        return;
-    }
     iaInputTexto.value = '';
     modalImportarIa.classList.remove('hidden-view');
 });
@@ -644,13 +654,23 @@ btnEjecutarIa.addEventListener('click', async () => {
         return;
     }
 
-    const apiKey = localStorage.geminiApiKey;
     const btnSpan = btnEjecutarIa.querySelector('span');
     const originalText = btnSpan.textContent;
     btnSpan.textContent = 'Analizando con IA...';
     btnEjecutarIa.disabled = true;
 
-    const prompt = `
+    try {
+        // Obtener clave desde Firestore
+        const configDoc = await getDoc(doc(db, "config", "apiKeys"));
+        const apiKey = configDoc.exists() ? configDoc.data().gemini : null;
+
+        if (!apiKey) {
+            Swal.fire('Falta Configuración', 'El Administrador aún no ha configurado la clave de IA.', 'warning');
+            cerrarModalIa();
+            return;
+        }
+
+        const prompt = `
 Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este texto desordenado de un estado de cuenta bancario.
 Responde ÚNICAMENTE con un arreglo en formato JSON válido. Ni una sola palabra más, sin bloques de markdown.
 Estructura exacta por objeto:
