@@ -273,22 +273,76 @@ document.querySelectorAll('.filtro-btn').forEach(btn => {
 btnDescargarPdf.addEventListener('click', () => {
     const element = document.getElementById('report-content');
     
-    // Ocultar botones
+    // Ocultar botones interactivos
     document.querySelectorAll('.pdf-export-hide').forEach(el => el.classList.add('hidden'));
 
-    const isDarkTheme = htmlEl.classList.contains('dark');
+    // Guardar estado original
+    const wasDark = htmlEl.classList.contains('dark');
+    const originalClasses = element.className;
+    const originalStyle = element.getAttribute('style') || '';
+
+    // 1. Forzar Modo Claro (mejor contraste para imprimir)
+    if (wasDark) applyTheme(false);
+
+    // 2. Preparar el contenedor para que html2canvas no genere barras negras en los márgenes
+    element.className = 'p-8 bg-white'; // Quitar mx-auto, px-4, max-w-7xl temporalmente
+    element.style.width = '1200px'; // Forzar ancho de escritorio
+    element.style.maxWidth = '1200px';
+    element.style.margin = '0';
+    element.style.background = '#ffffff';
+
+    // 3. Forzar fondos sólidos en las tarjetas de cristal (html2canvas sufre con backdrop-filter)
+    const glassCards = element.querySelectorAll('.glass-card');
+    glassCards.forEach(c => {
+        c.setAttribute('data-orig-style', c.getAttribute('style') || '');
+        c.style.background = '#ffffff';
+        c.style.backdropFilter = 'none';
+        c.style.boxShadow = 'none';
+        c.style.border = '1px solid #e2e8f0';
+    });
+
+    // 4. Cambiar color del texto explícitamente para asegurar contraste
+    const texts = element.querySelectorAll('.text-slate-500, .text-slate-400');
+    texts.forEach(t => {
+        t.setAttribute('data-orig-text', 'true');
+        t.style.color = '#475569'; // text-slate-600
+    });
+
     const opt = {
-      margin:       0.5,
+      margin:       [0.5, 0.5, 0.5, 0.5], // Top, Left, Bottom, Right
       filename:     `Finanzas_Reporte_${new Date().toLocaleDateString('es-CL')}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: isDarkTheme ? '#0F172A' : '#f8fafc' },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      image:        { type: 'jpeg', quality: 1 },
+      html2canvas:  { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#ffffff',
+          windowWidth: 1200,
+          scrollY: 0
+      },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
-    html2pdf().set(opt).from(element).save().then(() => {
-        // Mostrar botones de vuelta
-        document.querySelectorAll('.pdf-export-hide').forEach(el => el.classList.remove('hidden'));
-    });
+    // Dar tiempo a Chart.js para renderizar colores claros si venía de oscuro
+    setTimeout(() => {
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Restaurar estado original
+            document.querySelectorAll('.pdf-export-hide').forEach(el => el.classList.remove('hidden'));
+            element.className = originalClasses;
+            element.setAttribute('style', originalStyle);
+            
+            glassCards.forEach(c => {
+                c.setAttribute('style', c.getAttribute('data-orig-style'));
+            });
+
+            texts.forEach(t => {
+                t.style.color = '';
+                t.removeAttribute('data-orig-text');
+            });
+
+            if (wasDark) applyTheme(true);
+        });
+    }, 300);
 });
 
 // CRUD Deudas
