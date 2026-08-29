@@ -309,9 +309,9 @@
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 flex-grow" id="report-content">
             
             <div class="mb-8 md:mb-10 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 fade-in">
-                <div class="min-w-0 w-full">
-                    <h2 id="saludo-header" class="text-3xl md:text-4xl font-display font-bold text-slate-900 dark:text-white truncate">Hola</h2>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm md:text-base mt-2 font-medium truncate">Este es tu resumen financiero al día de hoy.</p>
+                <div class="min-w-0 w-full max-w-full overflow-hidden">
+                    <h2 id="saludo-header" class="text-3xl md:text-4xl font-display font-bold text-slate-900 dark:text-white break-words whitespace-normal">Hola</h2>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm md:text-base mt-2 font-medium break-words whitespace-normal">Este es tu resumen financiero al día de hoy.</p>
                 </div>
                 <div class="hidden md:flex flex-wrap gap-3 pdf-export-hide no-print">
                     <button id="btn-descargar-pdf" class="glass-card hover:bg-white/50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2">
@@ -329,8 +329,8 @@
                 </div>
             </div>
 
-            <div class="flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-3 gap-4 md:gap-6 mb-10 pb-4 sm:pb-0 snap-x snap-mandatory fade-in w-full" style="animation-delay: 0.1s;">
-                <div class="glass-card min-w-[85vw] sm:min-w-0 p-6 rounded-3xl border-t-2 border-t-primary snap-center flex flex-col justify-center relative overflow-hidden group">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10 fade-in w-full" style="animation-delay: 0.1s;">
+                <div class="glass-card w-full p-6 rounded-3xl border-t-2 border-t-primary flex flex-col justify-center relative overflow-hidden group">
                     <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors"></div>
                     <div class="flex items-center gap-3 mb-2">
                         <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
@@ -341,7 +341,7 @@
                     <h3 id="stat-total" class="text-3xl md:text-4xl font-display font-bold text-slate-900 dark:text-white mt-1 truncate">$0</h3>
                 </div>
                 
-                <div class="glass-card min-w-[85vw] sm:min-w-0 p-6 rounded-3xl border-t-2 border-t-secondary snap-center flex flex-col justify-center relative overflow-hidden group">
+                <div class="glass-card w-full p-6 rounded-3xl border-t-2 border-t-secondary flex flex-col justify-center relative overflow-hidden group">
                     <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-secondary/10 rounded-full blur-xl group-hover:bg-secondary/20 transition-colors"></div>
                     <div class="flex items-center gap-3 mb-2">
                         <div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
@@ -352,7 +352,7 @@
                     <h3 id="stat-mensual" class="text-3xl md:text-4xl font-display font-bold text-slate-900 dark:text-white mt-1 truncate">$0</h3>
                 </div>
                 
-                <div class="glass-card min-w-[85vw] sm:min-w-0 p-6 rounded-3xl border-t-2 border-t-accent snap-center flex flex-col justify-center relative overflow-hidden group">
+                <div class="glass-card w-full p-6 rounded-3xl border-t-2 border-t-accent flex flex-col justify-center relative overflow-hidden group">
                     <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-accent/10 rounded-full blur-xl group-hover:bg-accent/20 transition-colors"></div>
                     <div class="flex items-center gap-3 mb-2">
                         <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
@@ -364,8 +364,8 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 fade-in w-full" style="animation-delay: 0.2s;">
-                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0 overflow-hidden w-full">
+            <div class="flex flex-col lg:flex-row gap-6 mb-10 fade-in w-full max-w-full overflow-hidden" style="animation-delay: 0.2s;">
+                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0 w-full lg:w-1/2 overflow-hidden flex-shrink-0">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="font-display font-semibold text-lg text-slate-800 dark:text-slate-200">Deuda por Entidad</h3>
                         <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
@@ -376,7 +376,7 @@
                         <canvas id="chartOrigen"></canvas>
                     </div>
                 </div>
-                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0 overflow-hidden w-full">
+                <div class="glass-card p-6 md:p-8 rounded-3xl group min-w-0 w-full lg:w-1/2 overflow-hidden flex-shrink-0">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="font-display font-semibold text-lg text-slate-800 dark:text-slate-200">Estado de las Cuotas</h3>
                         <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center">
