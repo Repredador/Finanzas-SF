@@ -61,7 +61,7 @@ onAuthStateChanged(auth, (user) => {
         // Usuario logueado
         loginScreen.classList.add('hidden-view');
         dashboardScreen.classList.remove('hidden-view');
-        userEmailDisplay.textContent = user.email;
+        if (userEmailDisplay) userEmailDisplay.textContent = user.email;
     } else {
         // Usuario NO logueado
         dashboardScreen.classList.add('hidden-view');
