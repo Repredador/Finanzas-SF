@@ -288,8 +288,45 @@ document.querySelectorAll('.filtro-btn').forEach(btn => {
 });
 
 // --- EXPORTAR A PDF (REPORTE PROFESIONAL jsPDF) ---
-btnDescargarPdf.addEventListener('click', () => {
-    // 1. Obtener la librería
+btnDescargarPdf.addEventListener('click', async () => {
+    // 1. Mostrar loading
+    const btnSpan = btnDescargarPdf.querySelector('span');
+    const originalText = btnSpan ? btnSpan.textContent : 'Exportar PDF';
+    if (btnSpan) btnSpan.textContent = 'Generando Reporte de IA...';
+    btnDescargarPdf.disabled = true;
+
+    // 2. Fetch AI insights
+    let aiSummaryText = "";
+    try {
+        const configDoc = await getDoc(doc(db, "config", "apiKeys"));
+        const rawApiKey = configDoc.exists() ? configDoc.data().gemini : null;
+        const apiKey = rawApiKey ? rawApiKey.trim() : null;
+
+        if (apiKey && allDeudas.length > 0) {
+            const prompt = `Actúa como un analista financiero experto. Aquí están los datos de mis deudas actuales:
+Total Adeudado: ${statTotal.textContent}
+Pago Mensual: ${statMensual.textContent}
+Detalle: ${JSON.stringify(allDeudas.map(d => ({ nombre: d.nombre, monto: d.montoTotal, estado: d.calculo.estado, origen: d.origen })))}
+
+Escribe un resumen ejecutivo profesional y muy breve (máximo 4 líneas) analizando la situación y dando una recomendación amable. 
+Sin formato markdown, solo texto plano. Da consejos accionables si aplica.`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                aiSummaryText = data.candidates[0].content.parts[0].text.trim();
+            }
+        }
+    } catch (e) {
+        console.error("No se pudo obtener el resumen de IA", e);
+    }
+
+    // 3. Obtener la librería
     const { jsPDF } = window.jspdf;
     // Orientación paisaje, unidad puntos, tamaño carta
     const doc = new jsPDF('landscape', 'pt', 'letter');
@@ -337,16 +374,30 @@ btnDescargarPdf.addEventListener('click', () => {
     doc.text(statMensual.textContent, 290, 155);
     doc.text(statActivas.textContent, 530, 155);
 
+    // --- RESUMEN EJECUTIVO DE IA ---
+    let offsetY = 190;
+    if (aiSummaryText) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(79, 70, 229); // Primary color
+        doc.text("Resumen Ejecutivo de Analista IA", 40, offsetY);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(71, 85, 105);
+        
+        const textLines = doc.splitTextToSize(aiSummaryText, 700);
+        doc.text(textLines, 40, offsetY + 20);
+        
+        offsetY += 20 + (textLines.length * 15);
+    } else {
+        offsetY = 190;
+    }
+
     // --- GRÁFICOS (Extraer del Canvas real) ---
-    // Necesitamos asegurarnos de que el fondo del gráfico sea blanco antes de extraer, 
-    // pero Chart.js por defecto tiene fondo transparente. 
-    // La forma fácil: extraer con toDataURL y pintar un fondo en jsPDF.
-    
-    // Nota: toDataURL funciona bien si el canvas está renderizado.
     const addChartToPdf = (canvasId, x, y, w, h) => {
         const canvas = document.getElementById(canvasId);
         if(canvas) {
-            // Pintar un cuadrado blanco de fondo en el PDF para asegurar contraste
             doc.setFillColor(255, 255, 255);
             doc.rect(x, y, w, h, 'F');
             const imgData = canvas.toDataURL("image/png", 1.0);
@@ -355,11 +406,13 @@ btnDescargarPdf.addEventListener('click', () => {
     };
 
     doc.setFontSize(12);
-    doc.text("Deuda por Origen", 150, 210);
-    doc.text("Estado de las Cuotas", 500, 210);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text("Deuda por Origen", 150, offsetY + 20);
+    doc.text("Estado de las Cuotas", 500, offsetY + 20);
     
-    addChartToPdf('chartOrigen', 40, 230, 250, 150);
-    addChartToPdf('chartEstado', 360, 230, 350, 150);
+    addChartToPdf('chartOrigen', 40, offsetY + 40, 250, 150);
+    addChartToPdf('chartEstado', 360, offsetY + 40, 350, 150);
 
     // --- TABLA DE DATOS ---
     // Recopilar datos filtrados
@@ -378,7 +431,7 @@ btnDescargarPdf.addEventListener('click', () => {
     ]);
 
     doc.autoTable({
-        startY: 420,
+        startY: offsetY + 210,
         head: [['Origen', 'Nombre', 'Monto Total', 'Cuotas', 'Estado']],
         body: tableData,
         theme: 'grid',
@@ -405,6 +458,9 @@ btnDescargarPdf.addEventListener('click', () => {
 
     // --- DESCARGAR ---
     doc.save(`Reporte_Finanzas_${new Date().toLocaleDateString('es-CL')}.pdf`);
+    
+    if (btnSpan) btnSpan.textContent = originalText;
+    btnDescargarPdf.disabled = false;
 });
 
 // CRUD Deudas
