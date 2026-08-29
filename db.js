@@ -29,7 +29,9 @@ const btnImportarIa = document.getElementById('btn-importar-ia');
 const modalImportarIa = document.getElementById('modal-importar-ia');
 const btnCerrarModalIa = document.getElementById('btn-cerrar-modal-ia');
 const btnEjecutarIa = document.getElementById('btn-ejecutar-ia');
-const iaInputTexto = document.getElementById('ia-input-texto');
+const iaInputPdf = document.getElementById('ia-input-pdf');
+const pdfDropZone = document.getElementById('pdf-drop-zone');
+const pdfFileName = document.getElementById('pdf-file-name');
 
 const modalPreviewIa = document.getElementById('modal-preview-ia');
 const btnCerrarPreviewIa = document.getElementById('btn-cerrar-preview-ia');
@@ -637,7 +639,8 @@ btnGuardarLlaveIa.addEventListener('click', async () => {
 
 const cerrarModalIa = () => modalImportarIa.classList.add('hidden-view');
 btnImportarIa.addEventListener('click', () => {
-    iaInputTexto.value = '';
+    if (iaInputPdf) iaInputPdf.value = '';
+    if (pdfFileName) pdfFileName.textContent = 'Haz clic o arrastra tu PDF aquí';
     modalImportarIa.classList.remove('hidden-view');
 });
 btnCerrarModalIa.addEventListener('click', cerrarModalIa);
@@ -647,32 +650,68 @@ const cerrarPreviewIa = () => modalPreviewIa.classList.add('hidden-view');
 btnCerrarPreviewIa.addEventListener('click', cerrarPreviewIa);
 btnCancelarPreviewIa.addEventListener('click', cerrarPreviewIa);
 
+// DRAG AND DROP PDF
+pdfDropZone.addEventListener('click', () => iaInputPdf.click());
+
+pdfDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    pdfDropZone.classList.add('bg-purple-50', 'dark:bg-purple-900/20');
+});
+
+pdfDropZone.addEventListener('dragleave', () => {
+    pdfDropZone.classList.remove('bg-purple-50', 'dark:bg-purple-900/20');
+});
+
+pdfDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    pdfDropZone.classList.remove('bg-purple-50', 'dark:bg-purple-900/20');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        iaInputPdf.files = e.dataTransfer.files;
+        pdfFileName.textContent = iaInputPdf.files[0].name;
+    }
+});
+
+iaInputPdf.addEventListener('change', () => {
+    if (iaInputPdf.files && iaInputPdf.files.length > 0) {
+        pdfFileName.textContent = iaInputPdf.files[0].name;
+    } else {
+        pdfFileName.textContent = 'Haz clic o arrastra tu PDF aquí';
+    }
+});
+
 btnEjecutarIa.addEventListener('click', async () => {
-    const textoCrudo = iaInputTexto.value.trim();
-    if (!textoCrudo) {
-        Swal.fire('Error', 'Pega el texto del estado de cuenta primero.', 'error');
+    const file = iaInputPdf.files[0];
+    if (!file) {
+        Swal.fire('Error', 'Por favor selecciona o arrastra un archivo PDF.', 'warning');
         return;
     }
-
+    
     const btnSpan = btnEjecutarIa.querySelector('span');
     const originalText = btnSpan.textContent;
-    btnSpan.textContent = 'Analizando con IA...';
+    btnSpan.textContent = 'Analizando PDF...';
     btnEjecutarIa.disabled = true;
 
     try {
-        // Obtener clave desde Firestore
         const configDoc = await getDoc(doc(db, "config", "apiKeys"));
         const apiKey = configDoc.exists() ? configDoc.data().gemini : null;
 
         if (!apiKey) {
             Swal.fire('Falta Configuración', 'El Administrador aún no ha configurado la clave de IA.', 'warning');
             cerrarModalIa();
+            btnSpan.textContent = originalText;
+            btnEjecutarIa.disabled = false;
             return;
         }
 
-        const prompt = `
-Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este texto desordenado de un estado de cuenta bancario.
-Responde ÚNICAMENTE con un arreglo en formato JSON válido. Ni una sola palabra más, sin bloques de markdown.
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        
+        reader.onload = async () => {
+            try {
+                const base64Data = reader.result.split(',')[1];
+                const prompt = `
+Eres un experto analista financiero. Tu tarea es extraer deudas o compras en cuotas a partir de este documento PDF (estado de cuenta).
+Identifica las transacciones que están siendo facturadas para pagar. Ignora abonos o pagos.
 Estructura exacta por objeto:
 {
   "origen": "string (nombre de tienda o banco. Ej: CMR, Ripley, Supermercado)",
@@ -682,51 +721,72 @@ Estructura exacta por objeto:
   "fechaPrimeraCuota": "string (YYYY-MM-DD. Aproxímala si es necesario, o usa la fecha de la transacción)"
 }
 
-Texto a analizar:
-${textoCrudo}
-    `;
+Responde ÚNICAMENTE con un arreglo de objetos JSON en el formato especificado.
+`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: "application/pdf", data: base64Data } }
+                            ]
+                        }],
+                        generationConfig: {
+                            responseMimeType: "application/json"
+                        }
+                    })
+                });
 
-        if (!response.ok) throw new Error("Error en la API de Gemini (Revisa tu clave)");
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
 
-        const data = await response.json();
-        let iaText = data.candidates[0].content.parts[0].text;
-        
-        // Limpiar markdown residual de la respuesta
-        iaText = iaText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        
-        deudasExtraidasIA = JSON.parse(iaText);
-        
-        if (!Array.isArray(deudasExtraidasIA) || deudasExtraidasIA.length === 0) {
-            throw new Error("No se encontraron deudas claras.");
-        }
+                const data = await response.json();
+                const resultText = data.candidates[0].content.parts[0].text;
+                
+                deudasExtraidasIA = JSON.parse(resultText);
+                
+                if (!Array.isArray(deudasExtraidasIA) || deudasExtraidasIA.length === 0) {
+                    throw new Error("No se encontraron deudas claras.");
+                }
 
-        // Renderizar Preview
-        cerrarModalIa();
-        let htmlPreview = '';
-        deudasExtraidasIA.forEach(d => {
-            htmlPreview += `
-                <tr class="bg-white/5 border-b border-black/5 dark:border-white/5">
-                    <td class="p-3 font-medium">${d.origen || '-'}</td>
-                    <td class="p-3">${d.nombre || '-'}</td>
-                    <td class="p-3 text-right font-mono">${formatMoney(d.montoTotal)}</td>
-                    <td class="p-3 text-center">${d.numeroCuotas || 0}</td>
-                    <td class="p-3 font-mono text-xs">${d.fechaPrimeraCuota || '-'}</td>
-                </tr>
-            `;
-        });
-        tablaPreviewIa.innerHTML = htmlPreview;
-        modalPreviewIa.classList.remove('hidden-view');
+                cerrarModalIa();
+                let htmlPreview = '';
+                deudasExtraidasIA.forEach(d => {
+                    htmlPreview += `
+                        <tr class="bg-white/5 border-b border-black/5 dark:border-white/5">
+                            <td class="p-3 font-medium">${d.origen || '-'}</td>
+                            <td class="p-3">${d.nombre || '-'}</td>
+                            <td class="p-3 text-right font-mono">${formatMoney(d.montoTotal)}</td>
+                            <td class="p-3 text-center">${d.numeroCuotas || 0}</td>
+                            <td class="p-3 font-mono text-xs">${d.fechaPrimeraCuota || '-'}</td>
+                        </tr>
+                    `;
+                });
+                tablaPreviewIa.innerHTML = htmlPreview;
+                modalPreviewIa.classList.remove('hidden-view');
+
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Oops...', 'La IA no pudo procesar este PDF. Asegúrate de que sea un Estado de Cuenta válido.', 'error');
+            } finally {
+                btnSpan.textContent = originalText;
+                btnEjecutarIa.disabled = false;
+            }
+        };
+
+        reader.onerror = () => {
+            Swal.fire('Error', 'No se pudo leer el archivo PDF.', 'error');
+            btnSpan.textContent = originalText;
+            btnEjecutarIa.disabled = false;
+        };
 
     } catch (error) {
         console.error(error);
-        Swal.fire('Oops...', 'La IA no pudo procesar este texto o falló la clave. Intenta de nuevo.', 'error');
-    } finally {
+        Swal.fire('Oops...', 'Fallo de red o clave.', 'error');
         btnSpan.textContent = originalText;
         btnEjecutarIa.disabled = false;
     }
