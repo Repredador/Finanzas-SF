@@ -135,7 +135,7 @@ const getProgressBarHtml = (cuotaActual, numCuotas) => {
 };
 
 const fetchDeudas = async (userId) => {
-    tablaDeudas.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">Cargando deudas...</td></tr>`;
+    tablaDeudas.innerHTML = `<div class="col-span-full p-12 text-center text-slate-400 glass-card rounded-3xl flex flex-col items-center justify-center"><svg class="animate-spin h-8 w-8 text-primary mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="font-medium">Cargando deudas...</p></div>`;
     try {
         const q = query(collection(db, "deudas"), where("userId", "==", userId));
         const querySnapshot = await getDocs(q);
@@ -187,27 +187,40 @@ const renderUI = () => {
         }
 
         deudasHtml += `
-            <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
-                <td class="p-4 font-medium">${data.origen || '-'}</td>
-                <td class="p-4">${data.nombre || '-'}</td>
-                <td class="p-4 text-right font-medium font-mono">${formatMoney(monto)}</td>
-                <td class="p-4 text-center">${getProgressBarHtml(calculo.cuotaNum, cuotas)}</td>
-                <td class="p-4 text-center"><span class="px-3 py-1 rounded-full text-xs border font-medium ${calculo.colorClass}">${calculo.estado}</span></td>
-                <td class="p-4 text-center pdf-export-hide no-print opacity-50 group-hover:opacity-100 transition-opacity">
-                    <div class="flex items-center justify-center gap-2">
-                        <button data-id="${data.id}" class="btn-editar text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 p-1" title="Editar">
-                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            <div class="glass-card rounded-2xl p-5 md:p-6 flex flex-col justify-between group hover:-translate-y-1 hover:shadow-glow-primary transition-all duration-300 relative overflow-hidden border border-white/20 dark:border-white/10">
+                <div class="absolute -right-12 -top-12 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+                
+                <div class="flex justify-between items-start mb-4 relative z-10">
+                    <div>
+                        <span class="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400 mb-2 border border-slate-200 dark:border-white/5">${data.origen || '-'}</span>
+                        <h4 class="font-display font-semibold text-lg text-slate-900 dark:text-white leading-tight">${data.nombre || '-'}</h4>
+                    </div>
+                    <div class="flex items-center gap-1 bg-white/50 dark:bg-black/20 p-1 rounded-xl backdrop-blur-sm border border-black/5 dark:border-white/5 shadow-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button data-id="${data.id}" class="btn-editar w-8 h-8 rounded-lg flex items-center justify-center text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors" title="Editar">
+                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         </button>
-                        <button data-id="${data.id}" class="btn-eliminar text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-1" title="Eliminar">
-                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <button data-id="${data.id}" class="btn-eliminar w-8 h-8 rounded-lg flex items-center justify-center text-accent hover:bg-accent/10 transition-colors" title="Eliminar">
+                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         </button>
                     </div>
-                </td>
-            </tr>
+                </div>
+                
+                <div class="mb-5 relative z-10">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-1">Monto Total</p>
+                    <p class="text-2xl font-display font-bold text-slate-900 dark:text-white">${formatMoney(monto)}</p>
+                </div>
+                
+                <div class="mt-auto relative z-10 bg-slate-50/50 dark:bg-black/10 rounded-xl p-4 border border-black/5 dark:border-white/5">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${calculo.colorClass}">${calculo.estado}</span>
+                    </div>
+                    ${getProgressBarHtml(calculo.cuotaNum, cuotas)}
+                </div>
+            </div>
         `;
     });
 
-    tablaDeudas.innerHTML = deudasFiltradas.length ? deudasHtml : `<tr><td colspan="6" class="p-8 text-center text-slate-500 dark:text-slate-400">No hay deudas que coincidan con el filtro.</td></tr>`;
+    tablaDeudas.innerHTML = deudasFiltradas.length ? deudasHtml : `<div class="col-span-full p-12 text-center text-slate-400 glass-card rounded-3xl"><p class="font-medium">No hay deudas que coincidan con el filtro.</p></div>`;
     statTotal.textContent = formatMoney(sumaTotal);
     statMensual.textContent = formatMoney(sumaMensualEstimada);
     statActivas.textContent = activasCount.toString();
